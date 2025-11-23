@@ -1,0 +1,13 @@
+version: "3.8"
+services:
+  krx-bot:
+    build: .
+    container_name: krx-bot
+    restart: unless-stopped
+    environment:
+      TELEGRAM_TOKEN: ${TELEGRAM_TOKEN}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+      LOG_LEVEL: WARNING
+    # 필요시 프록시 설정도 추가 가능
+    # environment:
+    #   HTTPS_PROXY: http://user:pass@proxy:port
