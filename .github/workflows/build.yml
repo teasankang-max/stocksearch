@@ -25,7 +25,7 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
+  
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
@@ -33,3 +33,5 @@ jobs:
           file: ./Dockerfile
           push: true
           tags: ghcr.io/${{ github.repository }}:latest
+          platforms: linux/amd64
+          provenance: false
