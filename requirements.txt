@@ -1,0 +1,9 @@
+python-telegram-bot==20.7
+google-generativeai
+pykrx
+pandas
+numpy
+mplfinance
+matplotlib
+playwright
+httpx
