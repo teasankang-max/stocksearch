@@ -1,9 +1,3 @@
-# keys
-my_keys.py
-*.env
-.env
-
-# python
 __pycache__/
 *.pyc
 *.pyo
@@ -13,13 +7,10 @@ venv/
 .env/
 *.egg-info/
 
-# tools / data
 .playwright/
 playwright-report/
 test-results/
-*.log
 
-# OS/editor
 .DS_Store
 Thumbs.db
 .vscode/
