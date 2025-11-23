@@ -25,18 +25,13 @@ from telegram.request import HTTPXRequest
 warnings.filterwarnings("ignore", category=UserWarning, module="pykrx")
 
 # -----------------------------
-# 비밀키 로드 (my_keys 모듈 또는 환경변수)
+# 환경변수(= GitHub Secrets로 주입)
 # -----------------------------
-try:
-    import my_keys as secrets  # GOOGLE_API_KEY, TELEGRAM_TOKEN
-    GOOGLE_API_KEY = secrets.GOOGLE_API_KEY
-    TELEGRAM_TOKEN = secrets.TELEGRAM_TOKEN
-except Exception:
-    GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
-    TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
 
-if not GOOGLE_API_KEY or not TELEGRAM_TOKEN:
-    raise RuntimeError("GOOGLE_API_KEY 또는 TELEGRAM_TOKEN이 설정되지 않았습니다.")
+if not TELEGRAM_TOKEN or not GOOGLE_API_KEY:
+    raise RuntimeError("환경변수 TELEGRAM_TOKEN / GOOGLE_API_KEY가 필요합니다. (GitHub Secrets 또는 OS 환경변수로 설정)")
 
 # -----------------------------
 # 로깅 (조용 + 토큰 마스킹)
@@ -65,14 +60,11 @@ for h in logging.getLogger().handlers:
     h.addFilter(RedactTokenFilter())
 
 # -----------------------------
-# Gemini 설정 (요청대로 고정)
+# Gemini 설정 (고정 모델)
 # -----------------------------
 genai.configure(api_key=GOOGLE_API_KEY)
 model = genai.GenerativeModel('gemini-2.0-flash')
 
-# -----------------------------
-# 리포트 프롬프트 (용어 설명 제거)
-# -----------------------------
 SYSTEM_PROMPT = """
 [SYSTEM]
 당신은 월스트리트 20년 경력의 시니어 애널리스트입니다.
@@ -291,14 +283,14 @@ async def get_marketmap_element_screenshot(market: str) -> Optional[bytes]:
             browser = await p.chromium.launch(headless=True)
             context = await browser.new_context(
                 viewport={"width": 1280, "height": 800},
-                device_scale_factor=1  # 용량 절감
+                device_scale_factor=1
             )
             page = await context.new_page()
             await page.goto(url, wait_until="networkidle", timeout=30000)
             await page.wait_for_timeout(1500)
 
             target = None
-            # 셀렉터들에서 탐색
+            # 후보 셀렉터 탐색
             for sel in MARKETMAP_SELECTORS:
                 try:
                     loc_all = page.locator(sel)
@@ -315,7 +307,7 @@ async def get_marketmap_element_screenshot(market: str) -> Optional[bytes]:
                 except Exception:
                     continue
 
-            # 가장 큰 canvas fallback
+            # canvas fallback (가장 큰 것)
             if target is None:
                 canvases = page.locator("canvas")
                 n = await canvases.count()
@@ -369,7 +361,6 @@ async def send_home_menu(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
 # 텔레그램 핸들러
 # -----------------------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # 기본 모드 리셋
     context.user_data['mode'] = None
     await send_home_menu(context, update.effective_chat.id)
 
@@ -434,7 +425,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await send_home_menu(context, update.effective_chat.id)
         return
 
-    # 기업 분석 모드
+    # 기업 분석
     msg = await update.message.reply_text(f"🔍 '{user_input}' KRX 데이터 조회 중...\n(잠시만 기다려주세요)")
     code, stock_info = get_krx_real_data(user_input)
 
@@ -447,7 +438,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="HTML"
     )
 
-    # 일봉 차트 전송
     chart_bytes = await asyncio.to_thread(make_daily_chart_image, code)
     if chart_bytes:
         await context.bot.send_photo(
@@ -461,7 +451,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text="차트 생성에 실패했습니다. (mplfinance 설치 권장)"
         )
 
-    # AI 리포트
     final_prompt = f"""
 {SYSTEM_PROMPT}
 
@@ -478,18 +467,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_id=update.effective_chat.id,
         text=text
     )
-    # 분석 끝나면 홈 메뉴
     await send_home_menu(context, update.effective_chat.id)
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     logging.exception("Unhandled exception", exc_info=context.error)
-    # 사용자에게 불필요한 에러 메시지는 보내지 않음
 
 # -----------------------------
 # 앱 빌더 (타임아웃/과부하 최소화)
 # -----------------------------
 def build_app():
-    # 텔레그램 요청 타임아웃 확대 (이미지 전송 안정화)
     request = HTTPXRequest(
         connect_timeout=30.0,
         read_timeout=120.0,
